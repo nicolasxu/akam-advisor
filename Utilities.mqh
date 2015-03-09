@@ -104,7 +104,7 @@ double getLastPrice () {
  * @param  {double}  amount   lot size
  * @return {uint}  Return the retcode of MqlTradeResult
  */
-uint marketBuy(double amount, int magicNumber) {
+uint marketBuy(double amount, ulong magicNumber) {
    /*
    printf("buying %f", amount);
    return 1;
@@ -141,7 +141,7 @@ uint marketBuy(double amount, int magicNumber) {
  * @param  {double}  amount   lot size
  * @return {uint}  Return the retcode of MqlTradeResult
  */
-uint marketSell(double amount, int magicNumber){
+uint marketSell(double amount, ulong magicNumber){
    /*
    printf("selling %f", amount);
    return 1;
@@ -213,37 +213,97 @@ class OrderCell: public CObject {
       double volume;
       ENUM_ORDER_TYPE orderType;
       datetime fillTime;
-      int magic;
+      ulong magic;
       double movingSpeed;
-      double lastPrice[];
+      double lastPrice;
       
-      bool stopLoss; // if true, after this order is profitable,
-                     // it will close before profit turns to loss. 
-                     // However, it will only close this order if it approaching profit zero. 
-                     // Once it shows profit, it cannot lose money. 
-      double stopLossPoint;
+      int preventLossPoint;
                      
       
-      double takeProfitPoint;
-      OrderCell(double price, ulong id, ENUM_ORDER_TYPE orderTypeMy, double orderVolume, int theMagic) {
+      int takeProfitPoint;
+      
+      double bestPrice;
+      OrderCell(double price, ulong id, ENUM_ORDER_TYPE orderTypeMy, double orderVolume, ulong theMagic) {
          this.openPrice = price;
          this.orderId = id;
          this.orderType = orderTypeMy;
          this.volume = orderVolume;
          this.magic = theMagic;
+         this.preventLossPoint = 135;
+         
+         if(orderTypeMy == ORDER_TYPE_BUY) {
+            this.bestPrice = 0;  // well below reasonable open price 
+            // so that the 1st run of updateBestPrice() will be correct
+         }
+         if(orderTypeMy == ORDER_TYPE_SELL) {
+            this.bestPrice = 100;  // well above reasonalb eopen price
+            // so that the 1st run of updateBestPrice() will be correct
+         }
          
       };
+      void updateBestPrice() {
+          double theLastPrice = getLastPrice();
+          if(this.orderType == ORDER_TYPE_BUY){
+           this.bestPrice = MathMax(this.openPrice, this.bestPrice);
+           this.bestPrice = MathMax(this.bestPrice, theLastPrice); 
+          }
+          if(this.orderType == ORDER_TYPE_SELL){
+            this.bestPrice = MathMin(this.bestPrice, this.openPrice);
+            this.bestPrice = MathMin(this.bestPrice, theLastPrice);
+          
+          }
+      }
       void preventLoss() {
-         double theLastPrice = getLastPrice();
+      
+         double currentPrice = getLastPrice();
+         
+         this.updateBestPrice();
+         
+          printf("--- The best price is: %f", this.bestPrice);
+          printf("--- OpenPrice is: %f", this.openPrice);
+          printf("--- current Price is: %f", currentPrice );
+          printf("--- last price is: %f", this.lastPrice);
+          printf("--- Magic is: %d", this.magic);        
+         
          if(this.orderType == ORDER_TYPE_BUY){
-            
+            printf("entering ORDER_TYPE_BUY  prvent loss");
+            if(this.bestPrice > this.openPrice + this.preventLossPoint*Point()) {
+               // based on bestPrice, prevent loss logic start
+               printf("prevent loss logic triggered for buy order");
+               printf("(this.openPrice + this.preventLossPoint*Point(): %f", (this.openPrice + this.preventLossPoint*Point()));
+               printf("this.preventLossPoint*Point()/2: %f", this.preventLossPoint*Point()/2);
+               printf("currentPrice - (this.openPrice + this.preventLossPoint*Point()*0.5): %f ",currentPrice - (this.openPrice + this.preventLossPoint*Point()*0.5) );
+               printf("currentPrice - this.lastPrice: %f",  currentPrice - this.lastPrice);
+               if(currentPrice < (this.openPrice + this.preventLossPoint*Point()*0.5) && currentPrice < this.lastPrice) {
+                  // based on current price
+                  // 1) between openPrice and openPrice + 1/2*preventLossPoint
+                  // 2) moving towards open price, which is currentPrice < this.lastPrice
+                  printf("prevent loss triggered - closing order with magic %d", this.magic);
+                  marketSell(this.volume, this.magic);
+               }
+            } else {
+               printf("buy order %d prevent loss activation not met", this.magic);
+            }
+      
          }
          
          if(this.orderType == ORDER_TYPE_SELL){
-            
-         }
+            printf("entering ORDER_TYPE_SELL prvent loss");
+            if(this.bestPrice < this.openPrice - this.preventLossPoint*Point()){
+               // prevent loss logic start  
+               printf("prevent loss logic triggered for sell order");
+               if(currentPrice > (this.openPrice - this.preventLossPoint*Point()*0.5) && currentPrice > this.lastPrice ) {
+                  printf("prevent loss triggered - closing order with magic %d", this.magic);
+                  marketBuy(this.volume, this.magic);   
+               }
+            } else {
+               printf("sell order %d prevent loss activation not met", this.magic);
+            }
+         } 
          
+         this.lastPrice = currentPrice;
       }
+      
       void takeProfit() {
       
       }
@@ -295,7 +355,7 @@ void updateOrderCells(const MqlTradeTransaction& trans, const MqlTradeRequest& r
         } else {
             // no such order exiist, then build new order cell
             printf("before Add(): cellList.Total(): %d", cellList.Total());
-            cellList.Add(new OrderCell(orderPrice, orderId, orderType, orderVolume, orderMagic));
+            cellList.Add(new OrderCell(orderPrice, orderId, orderType, orderVolume, request.magic));
             printf("after Add(): cellList.Total(): %d", cellList.Total());
         }   
      }
