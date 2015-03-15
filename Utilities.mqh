@@ -230,6 +230,7 @@ class OrderCell: public CObject {
          this.volume = orderVolume;
          this.magic = theMagic;
          this.preventLossPoint = 135;
+         this.takeProfitPoint = 135*4;
          
          if(orderTypeMy == ORDER_TYPE_BUY) {
             this.bestPrice = 0;  // well below reasonable open price 
@@ -305,7 +306,46 @@ class OrderCell: public CObject {
       }
       
       void takeProfit() {
+         
+         double currentPrice = getLastPrice();
+         
+         this.updateBestPrice();
+         
+         if(this.orderType == ORDER_TYPE_BUY){
+            if(this.bestPrice - this.openPrice > this.takeProfitPoint*Point() ){
+               marketSell(this.volume, this.magic);
+            }
+         }
+         
+         if(this.orderType == ORDER_TYPE_SELL){
+            if(this.openPrice -this.bestPrice > this.takeProfitPoint*Point() ){
+               marketBuy(this.volume, this.magic);   
+            }
+         }
+         
+         
+      }
       
+      void showCellProfit(double closePrice) {
+
+         double pl;
+         
+         if(this.orderType == ORDER_TYPE_BUY){
+            pl = closePrice - this.openPrice;
+            printf("-----------------------------------");
+            printf("---Buy order completed, profit: %G ---", pl);
+            printf("------magic: %d-----------------------------", this.magic);
+           
+         }
+         
+         if(this.orderType == ORDER_TYPE_SELL){
+            pl = closePrice - this.openPrice;
+            printf("-----------------------------------");
+            printf("---Sell order completed, profit: %G ---", pl);
+            printf("------magic: %d-----------------------------", this.magic);
+                        
+    
+         }        
       }
       
       ~OrderCell(void) {printf("destructing OrderCell...");};
@@ -320,7 +360,7 @@ void updateOrderCells(const MqlTradeTransaction& trans, const MqlTradeRequest& r
     ENUM_ORDER_TYPE orderType; // history add
     ulong theMagic;
    
-   if(trans.type == TRADE_TRANSACTION_REQUEST ){
+   if(trans.type == TRADE_TRANSACTION_REQUEST ) {
       // only 0 data in request and result when TRADE_TRANSACTION_HISTORY_ADD
       // only TRADE_TRANSACTION_REQUEST contains magic
       printf("result.price:   %f", result.price);
@@ -340,7 +380,8 @@ void updateOrderCells(const MqlTradeTransaction& trans, const MqlTradeRequest& r
       // it is closing order. 
      if(theMagic == closePositionMagic){
          // magic for closing all open position  
-         cellList.deleteAll(); 
+         //cellList.deleteAll(); 
+         cellList.showProfitDeleteAll(orderPrice);
          printf("All order deleted in cellList");
          printf("after removing all order: cellList.Total(): %d", cellList.Total());
      } else {
@@ -349,7 +390,8 @@ void updateOrderCells(const MqlTradeTransaction& trans, const MqlTradeRequest& r
         if(cellList.findByMagic(request.magic)){
             // if there is order with this magic, then remove it
             printf("before, cellList.Total(): %d", cellList.Total());
-            cellList.deleteByMagic(request.magic); 
+            //cellList.deleteByMagic(request.magic); 
+            cellList.showProfitDelete(request.magic, orderPrice);
             printf("after, cellList.Total(): %d", cellList.Total()); 
             
         } else {
@@ -360,9 +402,8 @@ void updateOrderCells(const MqlTradeTransaction& trans, const MqlTradeRequest& r
         }   
      }
    }
-   // check price logic 
-   //  - buy , else
-   //  - sell
+
+
 }
 
 class OrderList: public CList {
@@ -398,6 +439,35 @@ class OrderList: public CList {
    
    }
    
+   void showProfitDelete(ulong magic, double closePrice ) {
+      int total = this.Total();
+      for(int i=0;i< total;i++){
+         OrderCell *cell = this.GetNodeAtIndex(i);
+         
+         if(cell.magic == magic) {
+            
+           cell.showCellProfit(closePrice);
+           
+           this.Delete(i);
+         }
+            
+      }      
+   }
+   
+   void showProfitDeleteAll(double closePrice) {
+
+      int total = this.Total();
+      OrderCell* cell;
+      for(int i=total;i> 0;i--){
+         cell = this.GetNodeAtIndex(i-1);
+         cell.showCellProfit(closePrice);
+         this.Delete(i - 1);   
+      }
+   
+   
+   
+   }
+   
    int deleteByMagic(ulong magic) {
       int total = this.Total();
       for(int i=0;i< total;i++){
@@ -414,7 +484,7 @@ class OrderList: public CList {
    
    void deleteAll() {
 
-       int total = this.Total();
+      int total = this.Total();
       for(int i=total;i> 0;i--){
          this.Delete(i - 1);   
       }
