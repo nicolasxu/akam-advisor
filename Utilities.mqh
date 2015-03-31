@@ -1,6 +1,14 @@
 #include <Object.mqh>
 #include <Arrays\ArrayObj.mqh>
 #include <Arrays\List.mqh>
+
+
+int closePositionMagic = 200;
+
+void setClosePositionMagic(int magic){
+   closePositionMagic = magic;
+}
+
 // Print MqlTradeTransaction data structure
 void printTradeTransaction(const MqlTradeTransaction &trans) {
 //--- 
@@ -133,8 +141,9 @@ uint marketBuy(double amount, ulong magicNumber) {
     if(result.retcode==10016) Print(result.bid,result.ask,result.price);
     //--- return code of the trade server reply
     return result.retcode; 
-    
 }
+
+
 
 /**
  * Sell certian lot at market price.
@@ -351,64 +360,95 @@ class OrderCell: public CObject {
       ~OrderCell(void) {printf("destructing OrderCell...");};
 };
 
-
-void updateOrderCells(const MqlTradeTransaction& trans, const MqlTradeRequest& request, const MqlTradeResult& result) {
-   
-    double orderPrice; // history add
-    ulong orderId; // history add
-    double orderVolume;
-    ENUM_ORDER_TYPE orderType; // history add
-    ulong theMagic;
-   
-   if(trans.type == TRADE_TRANSACTION_REQUEST ) {
-      // only 0 data in request and result when TRADE_TRANSACTION_HISTORY_ADD
-      // only TRADE_TRANSACTION_REQUEST contains magic
-      printf("result.price:   %f", result.price);
-      printf("result.order:  %d", result.order);
-      printf("request.type:  %s", EnumToString(request.type));
-      printf("result.volume: %f", result.volume);
-      printf("request.magic %d", request.magic);
-      
-      orderPrice  = result.price; // 1
-      orderId     = result.order; // 2
-      orderType   = request.type; // 3
-      orderVolume = result.volume;// 4
-      theMagic  = request.magic;  // 5
-      
-      // if magic is not present, then add order to list
-      // if magic is in order list, then remove the order in the list, since
-      // it is closing order. 
-     if(theMagic == closePositionMagic){
-         // magic for closing all open position  
-         //cellList.deleteAll(); 
-         cellList.showProfitDeleteAll(orderPrice);
-         printf("All order deleted in cellList");
-         printf("after removing all order: cellList.Total(): %d", cellList.Total());
-     } else {
-         // not 2000, then follow the logic 
-      
-        if(cellList.findByMagic(request.magic)){
-            // if there is order with this magic, then remove it
-            printf("before, cellList.Total(): %d", cellList.Total());
-            //cellList.deleteByMagic(request.magic); 
-            cellList.showProfitDelete(request.magic, orderPrice);
-            printf("after, cellList.Total(): %d", cellList.Total()); 
-            
-        } else {
-            // no such order exiist, then build new order cell
-            printf("before Add(): cellList.Total(): %d", cellList.Total());
-            cellList.Add(new OrderCell(orderPrice, orderId, orderType, orderVolume, request.magic));
-            printf("after Add(): cellList.Total(): %d", cellList.Total());
-        }   
-     }
-   }
-
-
-}
-
 class OrderList: public CList {
 
    public:
+   
+   double netPosition;
+   OrderList() {
+      this.netPosition = 0;
+   }
+   
+   void updatePosition(const MqlTradeTransaction& trans) {
+
+      if(trans.type == TRADE_TRANSACTION_HISTORY_ADD) {
+         
+         if(PositionSelect(Symbol())) {
+           
+           double symbolPosition = PositionGetDouble(POSITION_VOLUME);
+           
+           long pType = PositionGetInteger(POSITION_TYPE);
+           
+           if(pType == POSITION_TYPE_BUY) {
+           
+               symbolPosition = symbolPosition;   
+               
+           } else {
+           
+               symbolPosition = -symbolPosition;
+           }
+           
+           this.netPosition = symbolPosition;
+           printf("position updated to: %f", this.netPosition);
+           
+         }  else {
+            
+            // If position is 0, then PositionSelect() will return false
+            this.netPosition = 0;
+         }
+      }
+   }
+   void updateOrderCells (const MqlTradeTransaction& trans, const MqlTradeRequest& request, const MqlTradeResult& result) {
+   
+      double orderPrice; // history add
+      ulong orderId; // history add
+      double orderVolume;
+      ENUM_ORDER_TYPE orderType; // history add
+      ulong theMagic;
+   
+      if(trans.type == TRADE_TRANSACTION_REQUEST ) {
+         // only 0 data in request and result when TRADE_TRANSACTION_HISTORY_ADD
+         // only TRADE_TRANSACTION_REQUEST contains magic
+         printf("result.price:   %f", result.price);
+         printf("result.order:  %d", result.order);
+         printf("request.type:  %s", EnumToString(request.type));
+         printf("result.volume: %f", result.volume);
+         printf("request.magic %d", request.magic);
+      
+         orderPrice  = result.price; // 1
+         orderId     = result.order; // 2
+         orderType   = request.type; // 3
+         orderVolume = result.volume;// 4
+         theMagic  = request.magic;  // 5
+      
+         // if magic is not present, then add order to list
+         // if magic is in order list, then remove the order in the list, since
+         // it is closing order. 
+         if(theMagic == closePositionMagic){
+            // magic for closing all open position  
+            //cellList.deleteAll(); 
+            this.showProfitDeleteAll(orderPrice);
+            printf("All order deleted in cellList");
+            printf("after removing all order: cellList.Total(): %d", this.Total());
+         } else {
+            // not 2000, then follow the logic 
+      
+               if(this.findByMagic(request.magic)){
+               // if there is order with this magic, then remove it
+               printf("before, cellList.Total(): %d", this.Total());
+               //cellList.deleteByMagic(request.magic); 
+               this.showProfitDelete(request.magic, orderPrice);
+               printf("after, cellList.Total(): %d", this.Total()); 
+            
+               } else {
+                  // no such order exiist, then build new order cell
+                  printf("before Add(): cellList.Total(): %d", this.Total());
+                  this.Add(new OrderCell(orderPrice, orderId, orderType, orderVolume, request.magic));
+                  printf("after Add(): cellList.Total(): %d", this.Total());
+               }   
+         }
+      }
+   }
    
    void preventLoss() {
       int total = this.Total();
@@ -463,9 +503,6 @@ class OrderList: public CList {
          cell.showCellProfit(closePrice);
          this.Delete(i - 1);   
       }
-   
-   
-   
    }
    
    int deleteByMagic(ulong magic) {
