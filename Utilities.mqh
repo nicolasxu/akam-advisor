@@ -112,12 +112,14 @@ double getLastPrice () {
  * @param  {double}  amount   lot size
  * @return {uint}  Return the retcode of MqlTradeResult
  */
-uint marketBuy(double amount, ulong magicNumber) {
+uint marketBuy(double amount, ulong magicNumber, double profit) {
    /*
    printf("buying %f", amount);
    return 1;
    */
+   
     printf("buying %f", amount);
+    double lastPrice = getLastPrice();
     MqlTradeRequest request={0};
     request.action = TRADE_ACTION_DEAL;
     request.type = ORDER_TYPE_BUY;
@@ -125,7 +127,12 @@ uint marketBuy(double amount, ulong magicNumber) {
     request.symbol = Symbol();
     request.volume = amount;
     request.sl = 0;
-    request.tp = 0;
+    if(profit > 0){
+       request.tp = lastPrice+ profit; // lastPrice may not be market buy price
+    } else {
+      request.tp = 0;
+    }
+    
     //request.price = 0;
     
     MqlTradeResult result = {0};
@@ -150,12 +157,13 @@ uint marketBuy(double amount, ulong magicNumber) {
  * @param  {double}  amount   lot size
  * @return {uint}  Return the retcode of MqlTradeResult
  */
-uint marketSell(double amount, ulong magicNumber){
+uint marketSell(double amount, ulong magicNumber, double profit){
    /*
    printf("selling %f", amount);
    return 1;
    */
     printf("selling %f", amount);
+    double lastPrice = getLastPrice();
     MqlTradeRequest request={0};
     request.action = TRADE_ACTION_DEAL;
     request.type = ORDER_TYPE_SELL;
@@ -163,7 +171,12 @@ uint marketSell(double amount, ulong magicNumber){
     request.symbol = Symbol();
     request.volume = amount;
     request.sl = 0;
-    request.tp = 0;
+    if(profit > 0){
+      request.tp = lastPrice - profit;    
+    } else {
+      request.tp = 0;
+    }
+   
     //request.price = 0;
     
     MqlTradeResult result = {0};
@@ -289,7 +302,7 @@ class OrderCell: public CObject {
                   // 1) between openPrice and openPrice + 1/2*preventLossPoint
                   // 2) moving towards open price, which is currentPrice < this.lastPrice
                   printf("prevent loss triggered - closing order with magic %d", this.magic);
-                  marketSell(this.volume, this.magic);
+                  marketSell(this.volume, this.magic, 0);
                }
             } else {
                printf("buy order %d prevent loss activation not met", this.magic);
@@ -304,7 +317,7 @@ class OrderCell: public CObject {
                printf("prevent loss logic triggered for sell order");
                if(currentPrice > (this.openPrice - this.preventLossPoint*Point()*0.5) && currentPrice > this.lastPrice ) {
                   printf("prevent loss triggered - closing order with magic %d", this.magic);
-                  marketBuy(this.volume, this.magic);   
+                  marketBuy(this.volume, this.magic, 0);   
                }
             } else {
                printf("sell order %d prevent loss activation not met", this.magic);
@@ -322,13 +335,13 @@ class OrderCell: public CObject {
          
          if(this.orderType == ORDER_TYPE_BUY){
             if(this.bestPrice - this.openPrice > this.takeProfitPoint*Point() ){
-               marketSell(this.volume, this.magic);
+               marketSell(this.volume, this.magic, 0);
             }
          }
          
          if(this.orderType == ORDER_TYPE_SELL){
             if(this.openPrice -this.bestPrice > this.takeProfitPoint*Point() ){
-               marketBuy(this.volume, this.magic);   
+               marketBuy(this.volume, this.magic, 0);   
             }
          }
          
