@@ -15,7 +15,7 @@
 double expectProfit = 100*Point();
 int timer = 5; // 5 minutes
 
-double initialOrderSize = 1;
+double initialOrderSize = 20;
 double nextOrderSize = initialOrderSize;
 
 int jjmaHandle;
@@ -72,22 +72,37 @@ void OnNewBar() {
    // So only one order is sent in every new bar
    newBarUsed = false;
    
-   CopyBuffer(jjmaHandle, 0, 0, 4, jjmaBuffer);
+   CopyBuffer(jjmaHandle, 0, 0, 8, jjmaBuffer);
    // jjmaBuffer[0], current time t unfinished value
    // jjmaBuffer[1], t - 1 value
    // jjmaBuffer[2], t - 2 value
-   double diff1 = jjmaBuffer[2] - jjmaBuffer[1]; // t - 1 diff
-   double diff2 = jjmaBuffer[3] - jjmaBuffer[2];
+   double diff1 =  jjmaBuffer[1] - jjmaBuffer[2]; // t - 1 diff
+   double diff2 = jjmaBuffer[2] - jjmaBuffer[3];
+   double diff3 = jjmaBuffer[3] - jjmaBuffer[4];
+   double diff4 = jjmaBuffer[4] - jjmaBuffer[5];
    
-   if( (diff1 >=0 && diff2 < 0) || (diff1<0 && diff2 >= 0)){
    
-      printf("diff1 - diff2: %G", diff1 - diff2);
-      
+   if(diff1 > 0 && diff2 > 0){
+      if(diff1 > diff2){
+         if(MathAbs(diff1 - diff2) > 200*0.000001) {
+            
+            printf("diff1 - diff2 > 200: %G", (diff1 - diff2)*1000000); 
+            marketBuy(initialOrderSize,5, expectProfit);
+         } 
+       
+      }
    }
    
-   
-   
-   
+   if(diff1< 0 && diff2 < 0){
+      if(diff1 < diff2){
+         
+         if(MathAbs(diff1 - diff2) > 200*0.000001) {
+            
+            printf("diff1 - diff2 > 200: %G", (diff1 - diff2)*1000000); 
+            marketSell(initialOrderSize, 6, expectProfit);
+         }            
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
