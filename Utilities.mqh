@@ -101,9 +101,65 @@ double getLastPrice () {
    }
 }
 
-// open position - magic 1000
-// close position - magic 2000
-// close position for specific OrderCell index in CList, 201, 202, 203...
+
+uint limitSell(double amount, ulong magicNumber, double price, double tp, double sl) {
+   printf("limit selling %G lot, at %G price, TP %G, SL %G", amount, price, tp, sl);
+   
+   MqlTradeRequest request = {0};
+   request.action = TRADE_ACTION_PENDING;
+   request.type   = ORDER_TYPE_SELL_LIMIT;
+   request.magic  = magicNumber;
+   request.symbol = Symbol();
+   request.volume = amount;
+   request.price  = price;
+   request.sl     = sl;
+   request.tp     = tp;
+   
+   MqlTradeResult result = {0};
+   
+   ResetLastError();
+
+    if(!OrderSend(request,result)) {
+      Print(__FUNCTION__,":",result.retcode);
+      return 0; 
+    }
+    //--- write the server reply to log  
+    Print(__FUNCTION__,":",result.comment);
+    if(result.retcode==10016) Print(result.bid,result.ask,result.price);
+    //--- return code of the trade server reply
+    return result.retcode;   
+   
+}
+
+
+uint limitBuy(double amount, ulong magicNumber, double price, double tp, double sl) {
+   printf("limit buying %G lot, at %G price, TP %G, SL %G", amount, price, tp, sl);
+   
+   MqlTradeRequest request = {0};
+   request.action = TRADE_ACTION_PENDING;
+   request.type   = ORDER_TYPE_BUY_LIMIT;
+   request.magic  = magicNumber;
+   request.symbol = Symbol();
+   request.volume = amount;
+   request.price  = price;
+   request.sl     = sl;
+   request.tp     = tp;
+   
+   MqlTradeResult result = {0};
+   
+   ResetLastError();
+
+    if(!OrderSend(request,result)) {
+      Print(__FUNCTION__,":",result.retcode);
+      return 0; 
+    }
+    //--- write the server reply to log  
+    Print(__FUNCTION__,":",result.comment);
+    if(result.retcode==10016) Print(result.bid,result.ask,result.price);
+    //--- return code of the trade server reply
+    return result.retcode;   
+   
+}
 
 
 
@@ -111,6 +167,8 @@ double getLastPrice () {
 /**
  * Buy certian lot at market price.
  * @param  {double}  amount   lot size
+   @param  {ulong}   magicNumber
+   @param  {double}  distance above the market buy price to take profit
  * @return {uint}  Return the retcode of MqlTradeResult
  */
 uint marketBuy(double amount, ulong magicNumber, double profit) {
