@@ -77,6 +77,7 @@ void printResult(const MqlTradeResult &result) {
 /**
  * Return bar open price
  * @param  {ENUM_TIMEFRAMES}  timeframe   The time frame you specify, e.g.: PERIOD_M1, PERIOD_H1, PERIOD_D1
+                                          0 for current time frame open price
  * @return {double}                       open price
  */ 
 double getCurrentBarOpenPrice(ENUM_TIMEFRAMES timeframe) {
