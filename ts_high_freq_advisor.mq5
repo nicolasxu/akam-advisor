@@ -10,6 +10,8 @@
 #include "Utilities.mqh"
 
 double basket[4] = {0};
+TickList *tickList = new TickList();
+
 /*  
 
 Summary:
@@ -61,6 +63,7 @@ int OnInit() {
 void OnDeinit(const int reason) {
 //--- destroy timer
    EventKillTimer();
+   delete tickList;
       
 }
 
@@ -76,18 +79,32 @@ void OnTick(){
 //| Timer function                                                   |
 //+------------------------------------------------------------------+
 void OnTimer(){
+  
    static int timerCounter = 0;
-   if(timerCounter < 3){
-      double openPrice = getCurrentBarOpenPrice(0);
- 
-     
-      if(timerCounter == 1){
-         limitSell(1,12345,openPrice, openPrice - 50 * Point(),0);
-         limitBuy(1,1234, openPrice + 1* Point(),openPrice + 50 * Point(),0);
-      }
-      
+         //limitSell(1,12345,openPrice, openPrice - 50 * Point(),0);
+         //limitBuy(1,1234, openPrice + 1* Point(),openPrice + 50 * Point(),0);  
+  
+  // basket[0] +55 ~ +30
+  // basket[1] 0   ~  30
+  // basket[2] 0   ~ -30
+  // basket[3] -30 ~ -50
+  
+  MqlTick theTick;
+  SymbolInfoTick(Symbol(),theTick);
+  TickObject *to = new TickObject(theTick);
+  tickList.Add(to);
+  
+  printf("tickList.length: %d", tickList.Total());
+  
+  
+  
+  
+  // due to the limitation of MT5, only one direction of limit order is allowed
+   if(basket[0]>= basket[3]) {
+      // buy direction 
+   } else {
+      // sell direction
    }
-   
    timerCounter++;
 
       

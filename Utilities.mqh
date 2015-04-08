@@ -95,6 +95,7 @@ double getLastPrice () {
    MqlTick tick;
    if(SymbolInfoTick(Symbol(),tick)) {
       return tick.last;
+      
    }
    else {
       return 0;
@@ -287,6 +288,7 @@ void updatePosition(const MqlTradeTransaction& trans, double& iPosition)  {
    }
 }
 
+
 class OrderCell: public CObject {
    public:
       double openPrice;
@@ -431,6 +433,28 @@ class OrderCell: public CObject {
       
       ~OrderCell(void) {printf("destructing OrderCell...");};
 };
+
+
+class TickList: public CList {
+    
+    
+};
+
+class TickObject: public CObject {
+   
+   public:
+   TickObject(MqlTick &t) {
+      this.tick = t;
+   }
+   ~TickObject() {
+      printf("removing TickObject");
+   }
+   MqlTick tick;
+   
+};
+
+
+
 
 class OrderList: public CList {
 
