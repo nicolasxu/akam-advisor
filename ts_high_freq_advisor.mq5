@@ -9,7 +9,7 @@
 
 #include "Utilities.mqh"
 
-double basket[] = {0};
+double basket[4] = {0};
 /*  
 
 Summary:
@@ -68,6 +68,8 @@ void OnDeinit(const int reason) {
 void OnTick(){
    double openPrice = getCurrentBarOpenPrice(0);
    
+   calculateBasket(basket);
+   
    
 }
 //+------------------------------------------------------------------+
@@ -75,12 +77,13 @@ void OnTick(){
 //+------------------------------------------------------------------+
 void OnTimer(){
    static int timerCounter = 0;
-   if(timerCounter < 50){
+   if(timerCounter < 3){
       double openPrice = getCurrentBarOpenPrice(0);
-      if(timerCounter %2 == 0) {
-         limitBuy(1,1234,openPrice,openPrice + 50*Point(),0);
-      } else {
-         limitSell(1,12345,openPrice,openPrice - 50*Point(),0);
+ 
+     
+      if(timerCounter == 1){
+         limitSell(1,12345,openPrice, openPrice - 50 * Point(),0);
+         limitBuy(1,1234, openPrice + 1* Point(),openPrice + 50 * Point(),0);
       }
       
    }
