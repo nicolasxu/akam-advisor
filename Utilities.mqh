@@ -449,7 +449,21 @@ class TickList: public CList {
       printf("fileHandle: %d", fileHandle);
       if(fileHandle != INVALID_HANDLE) {
          // safe to write file here
-         FileWrite(fileHandle, TimeCurrent(), Symbol(), EnumToString(_Period));
+         // file will be written to sandbox, not absolute path to the OS
+         // C:\Users\bobb\AppData\Roaming\MetaQuotes\Tester\158904DFD898D640E9B813D10F9EB397\Agent-127.0.0.1-3001\MQL5\Files
+       
+         
+         int total = this.Total();
+         TickObject * to;
+         for(int i=0;i<total;i++){
+            to = this.GetNodeAtIndex(i);
+            string row = "";
+            // if you want seconds:  (string)(long)to.tick.time
+            StringConcatenate(row, fileHandle,to.tick.time, ", ", DoubleToString(to.tick.last,5) );
+            FileWrite(fileHandle, row);
+            
+         }
+         
          FileClose(fileHandle);
          Print("File Writing successful! ");
       } else {
@@ -468,7 +482,7 @@ class TickObject: public CObject {
       this.tick = t;
    }
    ~TickObject() {
-      printf("removing TickObject");
+      //printf("removing TickObject");
    }
    MqlTick tick;
    

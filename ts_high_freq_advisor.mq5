@@ -35,21 +35,26 @@ void calculateBasket(double & theBasket[]) {
 
    if((currentPrice > openPrice) && (currentPrice < openPrice + 30 * Point())){
       theBasket[1] = theBasket[1] + 1;
-      TickObject *to = new TickObject(theTick);   
+      TickObject *to = new TickObject(theTick);
+      tickList.Add(to);
          
    }
    if((currentPrice < openPrice) && (currentPrice > openPrice - 30 * Point())) {
       theBasket[2] = theBasket[2] + 1;
       TickObject *to = new TickObject(theTick);   
+      tickList.Add(to);
    }
    if( (currentPrice >= openPrice + 30 * Point()) && (currentPrice <= openPrice + 55 * Point())) {
       theBasket[0] =  theBasket[0] + 1;
       TickObject *to = new TickObject(theTick);
+      tickList.Add(to);
    }
    if( (currentPrice <= openPrice - 30 * Point()) && (currentPrice >= openPrice - 55 * Point())) {
       theBasket[3] =  theBasket[3] + 1;
       TickObject *to = new TickObject(theTick);
+      tickList.Add(to);
    }
+   
    
    
 }
