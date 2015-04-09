@@ -437,6 +437,27 @@ class OrderCell: public CObject {
 
 class TickList: public CList {
     
+   public:
+   bool saveTickToFile() {
+      printf("saving file in saveTickToFile()");
+      string terminal_data_path = TerminalInfoString(TERMINAL_DATA_PATH);
+      string filename = terminal_data_path + "\\test.csv";
+
+      printf("filename: " + filename);
+      ResetLastError();
+      int fileHandle = FileOpen("test.csv", FILE_WRITE|FILE_CSV);
+      printf("fileHandle: %d", fileHandle);
+      if(fileHandle != INVALID_HANDLE) {
+         // safe to write file here
+         FileWrite(fileHandle, TimeCurrent(), Symbol(), EnumToString(_Period));
+         FileClose(fileHandle);
+         Print("File Writing successful! ");
+      } else {
+         Print("Operation FileOpen failed, error: ", GetLastError());
+      }
+   
+      return true;
+   }
     
 };
 

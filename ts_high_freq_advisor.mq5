@@ -8,6 +8,7 @@
 #property version   "1.00"
 
 #include "Utilities.mqh"
+#include "onnewbar.mqh"
 
 double basket[4] = {0};
 TickList *tickList = new TickList();
@@ -23,21 +24,31 @@ Summary:
 */ 
 
 void calculateBasket(double & theBasket[]) {
+
+
    double openPrice = getCurrentBarOpenPrice(0);
-   double currentPrice = getLastPrice();
-   //printf("openPrice: %G", openPrice);
-   //printf("currentPrice: %G", currentPrice);
+   
+   MqlTick theTick;
+   SymbolInfoTick(Symbol(),theTick);
+   
+   double currentPrice = theTick.last;
+
    if((currentPrice > openPrice) && (currentPrice < openPrice + 30 * Point())){
-      theBasket[1] = theBasket[1] + 1;   
+      theBasket[1] = theBasket[1] + 1;
+      TickObject *to = new TickObject(theTick);   
+         
    }
    if((currentPrice < openPrice) && (currentPrice > openPrice - 30 * Point())) {
       theBasket[2] = theBasket[2] + 1;
+      TickObject *to = new TickObject(theTick);   
    }
    if( (currentPrice >= openPrice + 30 * Point()) && (currentPrice <= openPrice + 55 * Point())) {
       theBasket[0] =  theBasket[0] + 1;
+      TickObject *to = new TickObject(theTick);
    }
    if( (currentPrice <= openPrice - 30 * Point()) && (currentPrice >= openPrice - 55 * Point())) {
       theBasket[3] =  theBasket[3] + 1;
+      TickObject *to = new TickObject(theTick);
    }
    
    
@@ -63,12 +74,13 @@ int OnInit() {
 void OnDeinit(const int reason) {
 //--- destroy timer
    EventKillTimer();
+   tickList.saveTickToFile();
    delete tickList;
       
 }
 
 
-void OnTick(){
+void OnEveryTick(){
    double openPrice = getCurrentBarOpenPrice(0);
    
    calculateBasket(basket);
@@ -89,12 +101,9 @@ void OnTimer(){
   // basket[2] 0   ~ -30
   // basket[3] -30 ~ -50
   
-  MqlTick theTick;
-  SymbolInfoTick(Symbol(),theTick);
-  TickObject *to = new TickObject(theTick);
-  tickList.Add(to);
   
-  printf("tickList.length: %d", tickList.Total());
+ // printf("tickList.length: %d", tickList.Total());
+  
   
   
   
@@ -107,8 +116,14 @@ void OnTimer(){
    }
    timerCounter++;
 
-      
 }
+
+void OnNewBar() {
+  
+   tickList.Clear();
+
+}
+
 //+------------------------------------------------------------------+
 //| Trade function                                                   |
 //+------------------------------------------------------------------+
