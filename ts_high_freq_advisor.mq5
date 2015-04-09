@@ -177,7 +177,7 @@ void OnNewBar() {
    printf("crossCounter: %d", crossCounter);
    crossCounter = 0;
    double openPrice = getCurrentBarOpenPrice(0);
-   limitSell(10,12345,openPrice,openPrice - 50*Point(),0);
+   limitSell(10,12345,openPrice,openPrice - 50*Point(),openPrice + 800*Point());
    
 
 }
