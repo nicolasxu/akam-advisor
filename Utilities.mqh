@@ -439,20 +439,37 @@ class TickList: public CList {
     
    public:
    bool saveTickToFile() {
-      printf("saving file in saveTickToFile()");
+     
       string terminal_data_path = TerminalInfoString(TERMINAL_DATA_PATH);
-      string filename = terminal_data_path + "\\test.csv";
+      string filename = "";
+      TickObject *tickObject = this.GetNodeAtIndex(1);
+      
+      if(tickObject != NULL) {
 
-      printf("filename: " + filename);
+         datetime tickTime = tickObject.tick.time;
+         string dateName = TimeToString(tickTime,TIME_DATE);
+         filename = dateName + ".csv";      
+
+      } else {
+         int start = 0;
+         int count = 2;
+         datetime tm[]; // array storing the returned bar time
+         //--- copy time 
+         CopyTime(_Symbol,PERIOD_D1,start,count,tm);
+
+         filename =  TimeToString(tm[1],TIME_DATE) + ".csv";
+         
+      }
+      
+      //printf("filename: " + filename);
       ResetLastError();
-      int fileHandle = FileOpen("test.csv", FILE_WRITE|FILE_CSV);
-      printf("fileHandle: %d", fileHandle);
+      int fileHandle = FileOpen(filename, FILE_WRITE|FILE_CSV);
+      //printf("fileHandle: %d", fileHandle);
       if(fileHandle != INVALID_HANDLE) {
          // safe to write file here
          // file will be written to sandbox, not absolute path to the OS
          // C:\Users\bobb\AppData\Roaming\MetaQuotes\Tester\158904DFD898D640E9B813D10F9EB397\Agent-127.0.0.1-3001\MQL5\Files
        
-         
          int total = this.Total();
          TickObject * to;
          for(int i=0;i<total;i++){
@@ -461,11 +478,10 @@ class TickList: public CList {
             // if you want seconds:  (string)(long)to.tick.time
             StringConcatenate(row, fileHandle,to.tick.time, ", ", DoubleToString(to.tick.last,5) );
             FileWrite(fileHandle, row);
-            
          }
          
          FileClose(fileHandle);
-         Print("File Writing successful! ");
+         //Print("File Writing successful! ");
       } else {
          Print("Operation FileOpen failed, error: ", GetLastError());
       }

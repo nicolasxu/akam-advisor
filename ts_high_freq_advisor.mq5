@@ -13,6 +13,8 @@
 double basket[4] = {0};
 TickList *tickList = new TickList();
 
+int crossCounter = 0;
+
 /*  
 
 Summary:
@@ -23,6 +25,32 @@ Summary:
 
 */ 
 
+void calculateCounter () {
+
+
+   double openPrice = getCurrentBarOpenPrice(0);
+   
+   MqlTick theTick;
+   SymbolInfoTick(Symbol(),theTick);
+   
+   double currentPrice = theTick.last;
+   
+   static bool isAbove = false;
+   
+   if(currentPrice > openPrice + 50 * Point()){
+      
+      if(isAbove == false) {
+         crossCounter++;
+         isAbove = true;
+      }
+         
+   } else if (currentPrice < openPrice - 50 * Point() ){
+      if(isAbove == true ) {
+         crossCounter++;
+         isAbove = false;
+      }
+   }
+}
 void calculateBasket(double & theBasket[]) {
 
 
@@ -32,7 +60,10 @@ void calculateBasket(double & theBasket[]) {
    SymbolInfoTick(Symbol(),theTick);
    
    double currentPrice = theTick.last;
+   
+   static bool isAbove = false;
 
+   /*
    if((currentPrice > openPrice) && (currentPrice < openPrice + 30 * Point())){
       theBasket[1] = theBasket[1] + 1;
       TickObject *to = new TickObject(theTick);
@@ -44,15 +75,31 @@ void calculateBasket(double & theBasket[]) {
       TickObject *to = new TickObject(theTick);   
       tickList.Add(to);
    }
-   if( (currentPrice >= openPrice + 30 * Point()) && (currentPrice <= openPrice + 55 * Point())) {
+   */
+   
+   if( currentPrice >= openPrice + 50 * Point()) {
       theBasket[0] =  theBasket[0] + 1;
-      TickObject *to = new TickObject(theTick);
-      tickList.Add(to);
+      if(!isAbove){
+
+         TickObject *to = new TickObject(theTick);
+         tickList.Add(to);
+         isAbove = true;
+         
+      }
+
    }
-   if( (currentPrice <= openPrice - 30 * Point()) && (currentPrice >= openPrice - 55 * Point())) {
+   if( currentPrice <= openPrice - 50 * Point()) {
       theBasket[3] =  theBasket[3] + 1;
-      TickObject *to = new TickObject(theTick);
-      tickList.Add(to);
+      
+      if(isAbove) {
+
+         TickObject *to = new TickObject(theTick);
+         tickList.Add(to);
+         isAbove = false;
+         // only record crossing the open price
+      
+      }
+
    }
    
    
@@ -79,7 +126,7 @@ int OnInit() {
 void OnDeinit(const int reason) {
 //--- destroy timer
    EventKillTimer();
-   tickList.saveTickToFile();
+   
    delete tickList;
       
 }
@@ -89,6 +136,7 @@ void OnEveryTick(){
    double openPrice = getCurrentBarOpenPrice(0);
    
    calculateBasket(basket);
+   calculateCounter();
    
    
 }
@@ -124,8 +172,13 @@ void OnTimer(){
 }
 
 void OnNewBar() {
-  
+   tickList.saveTickToFile();
    tickList.Clear();
+   printf("crossCounter: %d", crossCounter);
+   crossCounter = 0;
+   double openPrice = getCurrentBarOpenPrice(0);
+   limitSell(10,12345,openPrice,openPrice - 50*Point(),0);
+   
 
 }
 
