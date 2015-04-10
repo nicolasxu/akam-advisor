@@ -12,21 +12,21 @@ void setClosePositionMagic(int magic){
 // Print MqlTradeTransaction data structure
 void printTradeTransaction(const MqlTradeTransaction &trans) {
 //--- 
-  
-   string desc=EnumToString(trans.type)+"\r\n";
-   desc+="- Symbol: "+trans.symbol+"\r\n";
-   desc+="- Deal ticket: "+(string)trans.deal+"\r\n";
-   desc+="- Deal type: "+EnumToString(trans.deal_type)+"\r\n";
-   desc+="- Order ticket: "+(string)trans.order+"\r\n";
-   desc+="- Order type: "+EnumToString(trans.order_type)+"\r\n";
-   desc+="- Order state: "+EnumToString(trans.order_state)+"\r\n";
-   desc+="- Order time type: "+EnumToString(trans.time_type)+"\r\n";
-   desc+="- Order expiration: "+TimeToString(trans.time_expiration)+"\r\n";
-   desc+="- Price: "+StringFormat("%G",trans.price)+"\r\n";
-   desc+="- Price trigger: "+StringFormat("%G",trans.price_trigger)+"\r\n";
-   desc+="- Stop Loss: "+StringFormat("%G",trans.price_sl)+"\r\n";
-   desc+="- Take Profit: "+StringFormat("%G",trans.price_tp)+"\r\n";
-   desc+="- Volume: "+StringFormat("%G",trans.volume)+"\r\n";
+   string desc= "MqlTradeTransaction \r\n";
+   desc+="     - Type: "+EnumToString(trans.type)+"\r\n";
+   desc+="     - Symbol: "+trans.symbol+"\r\n";
+   desc+="     - Deal ticket: "+(string)trans.deal+"\r\n";
+   desc+="     - Deal type: "+EnumToString(trans.deal_type)+"\r\n";
+   desc+="     - Order ticket: "+(string)trans.order+"\r\n";
+   desc+="     - Order type: "+EnumToString(trans.order_type)+"\r\n";
+   desc+="     - Order state: "+EnumToString(trans.order_state)+"\r\n";
+   desc+="     - Order time type: "+EnumToString(trans.time_type)+"\r\n";
+   desc+="     - Order expiration: "+TimeToString(trans.time_expiration)+"\r\n";
+   desc+="     - Price: "+StringFormat("%G",trans.price)+"\r\n";
+   desc+="     - Price trigger: "+StringFormat("%G",trans.price_trigger)+"\r\n";
+   desc+="     - Stop Loss: "+StringFormat("%G",trans.price_sl)+"\r\n";
+   desc+="     - Take Profit: "+StringFormat("%G",trans.price_tp)+"\r\n";
+   desc+="     - Volume: "+StringFormat("%G",trans.volume)+"\r\n";
 //--- return the obtained string
    printf(desc);
 }
@@ -299,6 +299,8 @@ class OrderCell: public CObject {
       ENUM_ORDER_TYPE orderType;
       datetime fillTime;
       ulong magic;
+      double takeProfitPrice;
+      double stopLossPrice;
       double movingSpeed;
       double lastPrice;
       
@@ -308,7 +310,8 @@ class OrderCell: public CObject {
       int takeProfitPoint;
       
       double bestPrice;
-      OrderCell(double price, ulong id, ENUM_ORDER_TYPE orderTypeMy, double orderVolume, ulong theMagic) {
+      OrderCell(double price, ulong id, ENUM_ORDER_TYPE orderTypeMy, double orderVolume, ulong theMagic, 
+         double tp, double sl) {
          this.openPrice = price;
          this.orderId = id;
          this.orderType = orderTypeMy;
@@ -316,6 +319,9 @@ class OrderCell: public CObject {
          this.magic = theMagic;
          this.preventLossPoint = 135;
          this.takeProfitPoint = 135*4;
+         
+         this.takeProfitPrice = tp;
+         this.stopLossPrice = sl;
          
          if(orderTypeMy == ORDER_TYPE_BUY) {
             this.bestPrice = 0;  // well below reasonable open price 
@@ -592,7 +598,15 @@ class OrderList: public CList {
       double orderVolume;
       ENUM_ORDER_TYPE orderType; // history add
       ulong theMagic;
+      double stopLoss;
+      double takeProfit;
       printf("transaction type: " + EnumToString(trans.type));
+      
+      if(trans.type == TRADE_TRANSACTION_HISTORY_ADD) {
+         printRequest(request);
+         printResult(result);
+         printTradeTransaction(trans);
+      }
       if(trans.type == TRADE_TRANSACTION_REQUEST ) {
          // only 0 data in request and result when TRADE_TRANSACTION_HISTORY_ADD
          // only TRADE_TRANSACTION_REQUEST contains magic
@@ -606,7 +620,9 @@ class OrderList: public CList {
          orderId     = result.order; // 2
          orderType   = request.type; // 3
          orderVolume = result.volume;// 4
-         theMagic  = request.magic;  // 5
+         theMagic    = request.magic;  // 5
+         takeProfit  = request.tp;
+         stopLoss    = request.sl;
       
          // if magic is not present, then add order to list
          // if magic is in order list, then remove the order in the list, since
@@ -633,10 +649,21 @@ class OrderList: public CList {
                } else {
                   // no such order exiist, then build new order cell
                   printf("before Add(): cellList.Total(): %d", this.Total());
-                  this.Add(new OrderCell(orderPrice, orderId, orderType, orderVolume, request.magic));
+                  this.Add(new OrderCell(orderPrice, orderId, orderType, orderVolume, request.magic,takeProfit, stopLoss));
                   printf("after Add(): cellList.Total(): %d", this.Total());
                }   
          }
+      }
+      
+      /// when execution from server side, e.g.: take profit or stop loss
+      if(trans.type == TRADE_TRANSACTION_HISTORY_ADD) {
+         // 1. found by take profit price
+             // if  and has opposite direction then
+             // log profit, and remove order from this list
+         // 2. found by stop loss price
+             // if in opposite direction then
+             // log loss, and remove the order from the list
+      
       }
    }
    
@@ -707,7 +734,7 @@ class OrderList: public CList {
             
       }
       return -1;
-   }
+   } DEAL_TYPE
    
    void deleteAll() {
 

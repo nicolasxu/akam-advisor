@@ -138,6 +138,9 @@ void OnDeinit(const int reason) {
 //--- destroy timer
    EventKillTimer();
    
+   OrderCell *order = orderList.GetNodeAtIndex(0);
+   printf("****order.stopLossPrice: %G", order.stopLossPrice);
+   printf("****order.takeProfitPrice: %G", order.takeProfitPrice);
    delete tickList;
    delete orderList;
    delete lossList;
