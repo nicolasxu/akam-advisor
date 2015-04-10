@@ -187,8 +187,8 @@ void OnNewBar() {
    // reset crossCounter
    crossCounter = 0;
    double openPrice = getCurrentBarOpenPrice(0);
+
    limitSell(initialOrderSize,billyMagic++,openPrice, openPrice - 100*Point(),openPrice + 800*Point());
-   
 
 }
 
