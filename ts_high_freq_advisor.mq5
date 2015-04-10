@@ -14,6 +14,11 @@ double basket[4] = {0};
 TickList *tickList = new TickList();
 
 int crossCounter = 0;
+int billyMagic = 205;
+OrderList *orderList;
+LossList  *lossList;
+int minuteCounter = 0;
+double initialOrderSize = 1.0; // 1 lot
 
 /*  
 
@@ -115,7 +120,13 @@ int OnInit() {
 //--- create timer
    //EventSetMillisecondTimer(60*1000);
    
-   EventSetTimer(1);
+   EventSetTimer(1*60);
+   
+   orderList = new OrderList(lossList);
+   if(orderList == NULL) {
+      printf("Init CList error");
+      return INIT_FAILED;   
+   }   
       
 //---
    return(INIT_SUCCEEDED);
@@ -128,6 +139,8 @@ void OnDeinit(const int reason) {
    EventKillTimer();
    
    delete tickList;
+   delete orderList;
+   delete lossList;
       
 }
 
@@ -145,39 +158,36 @@ void OnEveryTick(){
 //+------------------------------------------------------------------+
 void OnTimer(){
   
-   static int timerCounter = 0;
-         //limitSell(1,12345,openPrice, openPrice - 50 * Point(),0);
-         //limitBuy(1,1234, openPrice + 1* Point(),openPrice + 50 * Point(),0);  
-  
-  // basket[0] +55 ~ +30
-  // basket[1] 0   ~  30
-  // basket[2] 0   ~ -30
-  // basket[3] -30 ~ -50
-  
-  
- // printf("tickList.length: %d", tickList.Total());
-  
-  
-  
-  
-  
-  // due to the limitation of MT5, only one direction of limit order is allowed
-   if(basket[0]>= basket[3]) {
-      // buy direction 
-   } else {
-      // sell direction
+   minuteCounter++;
+   
+   if(minuteCounter > 12*60) {
+      double position = orderList.netPosition;
+      
+      if(position > 0) {
+         marketSell(position, closePositionMagic,0);
+      }
+      if(position < 0) {
+         marketBuy(-position, closePositionMagic, 0);
+      }
+   
    }
-   timerCounter++;
+   
+
+
 
 }
 
 void OnNewBar() {
+   // reset the minute counter
+   minuteCounter = 0;
    tickList.saveTickToFile();
    tickList.Clear();
    printf("crossCounter: %d", crossCounter);
+   
+   // reset crossCounter
    crossCounter = 0;
    double openPrice = getCurrentBarOpenPrice(0);
-   limitSell(10,12345,openPrice,openPrice - 50*Point(),openPrice + 800*Point());
+   limitSell(initialOrderSize,billyMagic++,openPrice, openPrice - 100*Point(),openPrice + 800*Point());
    
 
 }
@@ -195,11 +205,13 @@ void OnTrade()
 //+------------------------------------------------------------------+
 void OnTradeTransaction(const MqlTradeTransaction& trans,
                         const MqlTradeRequest& request,
-                        const MqlTradeResult& result)
-  {
-//---
+                        const MqlTradeResult& result){
+
+
+   orderList.updatePosition(trans);
+   orderList.updateOrderCells(trans,request, result);
    
-  }
+}
 //+------------------------------------------------------------------+
 //| Tester function                                                  |
 //+------------------------------------------------------------------+

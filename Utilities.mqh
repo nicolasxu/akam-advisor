@@ -288,6 +288,8 @@ void updatePosition(const MqlTradeTransaction& trans, double& iPosition)  {
    }
 }
 
+class LossList: public CList {
+};
 
 class OrderCell: public CObject {
    public:
@@ -431,8 +433,31 @@ class OrderCell: public CObject {
          }        
       }
       
+      void logLoss(double closePrice, LossList* list) {
+         
+         double netProfit=0;
+         if(this.orderType == ORDER_TYPE_BUY) {
+            netProfit = closePrice - this.openPrice;
+         }
+         
+         if(this.orderType == ORDER_TYPE_SELL) {
+            netProfit = this.openPrice - closePrice;
+         }
+         printf("netProfit is: %G", netProfit);
+         if(netProfit < 0) {
+            Alert("Loss ", netProfit);
+            printf("loss ----------- %d", netProfit);
+            LossObject *loss = new LossObject(this.magic, -netProfit);
+            
+            list.Add(loss);
+         }
+      }
+      
       ~OrderCell(void) {printf("destructing OrderCell...");};
 };
+
+
+
 
 
 class TickList: public CList {
@@ -491,6 +516,17 @@ class TickList: public CList {
     
 };
 
+class LossObject: public CObject {
+   public:
+   ulong lossMagic;
+   double lossAmount;
+   LossObject(ulong m, double l) {
+      this.lossMagic = m;
+      this.lossAmount = l;
+   }
+   
+};
+
 class TickObject: public CObject {
    
    public:
@@ -512,8 +548,10 @@ class OrderList: public CList {
    public:
    
    double netPosition;
-   OrderList() {
+   LossList *lossList;
+   OrderList(LossList* l) {
       this.netPosition = 0;
+      this.lossList = l;
    }
    
    void updatePosition(const MqlTradeTransaction& trans) {
@@ -545,14 +583,16 @@ class OrderList: public CList {
          }
       }
    }
-   void updateOrderCells (const MqlTradeTransaction& trans, const MqlTradeRequest& request, const MqlTradeResult& result) {
+   void updateOrderCells (const MqlTradeTransaction& trans, 
+      const MqlTradeRequest& request, 
+      const MqlTradeResult& result) {
    
       double orderPrice; // history add
       ulong orderId; // history add
       double orderVolume;
       ENUM_ORDER_TYPE orderType; // history add
       ulong theMagic;
-   
+      printf("transaction type: " + EnumToString(trans.type));
       if(trans.type == TRADE_TRANSACTION_REQUEST ) {
          // only 0 data in request and result when TRADE_TRANSACTION_HISTORY_ADD
          // only TRADE_TRANSACTION_REQUEST contains magic
@@ -579,13 +619,16 @@ class OrderList: public CList {
             printf("after removing all order: cellList.Total(): %d", this.Total());
          } else {
             // not 2000, then follow the logic 
-      
-               if(this.findByMagic(request.magic)){
-               // if there is order with this magic, then remove it
-               printf("before, cellList.Total(): %d", this.Total());
-               //cellList.deleteByMagic(request.magic); 
-               this.showProfitDelete(request.magic, orderPrice);
-               printf("after, cellList.Total(): %d", this.Total()); 
+               OrderCell *order = findByMagic(request.magic);
+               
+               if(order != NULL){
+                  // if there is order with this magic, then remove it
+                  printf("before, cellList.Total(): %d", this.Total());
+                  
+                  order.logLoss(orderPrice, this.lossList);
+                  this.showProfitDelete(request.magic, orderPrice);
+                  
+                  printf("after, cellList.Total(): %d", this.Total()); 
             
                } else {
                   // no such order exiist, then build new order cell
@@ -679,16 +722,16 @@ class OrderList: public CList {
       return false;
    }
    
-   bool findByMagic (ulong magic) {
+   OrderCell* findByMagic (ulong magic) {
    
       int total = this.Total();
       for(int i = 0; i< total; i++ ) {
          OrderCell *cell = this.GetNodeAtIndex(i);
          if(cell.magic == magic ) {
-            return true;
+            return cell;
          }
       }
-      return false;
+      return NULL;
    }
 };
 
