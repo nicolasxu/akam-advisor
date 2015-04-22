@@ -7,6 +7,8 @@
 #property link      "https://www.noWebsite5.com"
 #property version   "1.00"
 
+// It is intended to use on H1 period
+
 #include "OnNewBar.mqh"
 #include "Utilities.mqh"
 
@@ -24,155 +26,118 @@ double jjmaBuffer[];
 bool newBarUsed = false; // flag to control only one order is sent in every new bar, e.g.: hourly bar
 
 OrderList* orderList;
+LossList*  lossList;
 
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit(){
-//--- create timer
+
    EventSetTimer(60*timer);
    
-   jjmaHandle = iCustom(NULL,0,"Expert_Indicators\\jjma", 7, 100, PRICE_CLOSE,0,0); 
+   jjmaHandle = iCustom(NULL,0,"Expert_Indicators\\jjma", 10, 100, PRICE_WEIGHTED,0,0); 
    
    ArraySetAsSeries(jjmaBuffer, true);
    
-   orderList = new OrderList;
+   orderList = new OrderList(lossList);
    
    printf("jjmaHandle: %d", jjmaHandle);
-      
-//---
+     
    return(INIT_SUCCEEDED);
 }
-//+------------------------------------------------------------------+
-//| Expert deinitialization function                                 |
-//+------------------------------------------------------------------+
+
+
 void OnDeinit(const int reason) {
-//--- destroy timer
+
+
    EventKillTimer();
    
    // release handle
    IndicatorRelease(jjmaHandle);
    
-   
-    delete orderList;
+   delete orderList;
       
 }
-//+------------------------------------------------------------------+
-//| Expert tick function                                             |
-//+------------------------------------------------------------------+
 
 void OnEveryTick() {
+
+
+
+   CopyBuffer(jjmaHandle, 0, 0, 8, jjmaBuffer);
+   double p0 = jjmaBuffer[0];
+   double p1 = jjmaBuffer[1];
+   double p2 = jjmaBuffer[2];
+   double openPrice = getCurrentBarOpenPrice(0);
+   if(p0 > p1 && p2 > p1) {
+      // buy
+      if(orderList.netPosition <0) {
+         marketBuy(-orderList.netPosition,123,0);
+      }
+      //limitBuy(1,1234,openPrice +5*Point(),openPrice + expectProfit,0);
+      marketBuy(1,1234,100*Point());
+   }
+   
+   if(p0 <p1 && p2 < p1) {
+      // sell
+      printf("selling--------------------------");
+      if(orderList.netPosition >0) {
+         marketSell(orderList.netPosition,1234,0);
+      }
+      limitSell(1,12345, openPrice -5*Point(), openPrice - expectProfit, 0);
+   }
+
+
+
 
 }
 
 void OnNewBar() {
-   // set this flag to false
-   // This flag will be set to true when an order is sent
-   // So only one order is sent in every new bar
-   newBarUsed = false;
    
-   CopyBuffer(jjmaHandle, 0, 0, 8, jjmaBuffer);
-   // jjmaBuffer[0], current time t unfinished value
-   // jjmaBuffer[1], t - 1 value
-   // jjmaBuffer[2], t - 2 value
-   double diff1 =  jjmaBuffer[1] - jjmaBuffer[2]; // t - 1 diff
-   double diff2 = jjmaBuffer[2] - jjmaBuffer[3];
-   double diff3 = jjmaBuffer[3] - jjmaBuffer[4];
-   double diff4 = jjmaBuffer[4] - jjmaBuffer[5];
-   
-   
-   if(diff1 > 0 && diff2 > 0){
-      if(diff1 > diff2){
-         if(MathAbs(diff1 - diff2) > 200*0.000001) {
-            
-            printf("diff1 - diff2 > 200: %G", (diff1 - diff2)*1000000); 
-            marketBuy(initialOrderSize,5, expectProfit);
-         } 
-       
-      }
-   }
-   
-   if(diff1< 0 && diff2 < 0){
-      if(diff1 < diff2){
-         
-         if(MathAbs(diff1 - diff2) > 200*0.000001) {
-            
-            printf("diff1 - diff2 > 200: %G", (diff1 - diff2)*1000000); 
-            marketSell(initialOrderSize, 6, expectProfit);
-         }            
-      }
-   }
+
 }
 
-//+------------------------------------------------------------------+
-//| Timer function                                                   |
-//+------------------------------------------------------------------+
+
 void OnTimer(){
-//---
-   CopyBuffer(jjmaHandle, 0, 0, 4, jjmaBuffer);
-  
-   
-   
-   // situation 1
-   
-   // situation 2
-   
-   // situation 3
-   
-   // situation 4
-   
-   // before order sent, close all position that is in other direction first
-   
-   
    
 }
 //+------------------------------------------------------------------+
 //| Trade function                                                   |
 //+------------------------------------------------------------------+
-void OnTrade()
-  {
-//---
-   
-  }
-//+------------------------------------------------------------------+
-//| TradeTransaction function                                        |
-//+------------------------------------------------------------------+
+void OnTrade(){
+
+}
+
+
 void OnTradeTransaction(const MqlTradeTransaction& trans,
                         const MqlTradeRequest& request,
-                        const MqlTradeResult& result)
-  {
-//---
-   
-  }
-//+------------------------------------------------------------------+
-//| Tester function                                                  |
-//+------------------------------------------------------------------+
-double OnTester()
-  {
-//---
-   double ret=0.0;
-//---
+                        const MqlTradeResult& result) {
 
-//---
+   orderList.updatePosition(trans);
+   printf("position is: %G", orderList.netPosition);
+}
+
+
+
+double OnTester() {
+
+   double ret=0.0;
+
    return(ret);
-  }
-//+------------------------------------------------------------------+
-//| TesterInit function                                              |
-//+------------------------------------------------------------------+
+}
+
+
 void OnTesterInit() {
-//---
+
    
 }
 void OnTesterDeinit(){
         
 }
-//+------------------------------------------------------------------+
-//| TesterPass function                                              |
-//+------------------------------------------------------------------+
-void OnTesterPass()
-  {
-//---
+
+
+void OnTesterPass() {
    
-  }
-//+------------------------------------------------------------------+
+}
+
+

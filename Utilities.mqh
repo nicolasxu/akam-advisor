@@ -102,6 +102,17 @@ double getLastPrice () {
    }
 }
 
+double getLastAskPrice() {
+   MqlTick tick;
+   if(SymbolInfoTick(Symbol(),tick)) {
+      return tick.ask ;
+      
+   }
+   else {
+      return 0;
+   }
+}
+
 
 uint limitSell(double amount, ulong magicNumber, double price, double tp, double sl) {
    printf("limit selling %G lot, at %G price, TP %G, SL %G", amount, price, tp, sl);
@@ -137,7 +148,7 @@ uint limitBuy(double amount, ulong magicNumber, double price, double tp, double 
    printf("limit buying %G lot, at %G price, TP %G, SL %G", amount, price, tp, sl);
    
    MqlTradeRequest request = {0};
-   request.action = TRADE_ACTION_PENDING;
+   request.action = TRADE_ACTION_PENDING; //TRADE_ACTION_PENDING;
    request.type   = ORDER_TYPE_BUY_LIMIT;
    request.magic  = magicNumber;
    request.symbol = Symbol();
@@ -179,7 +190,7 @@ uint marketBuy(double amount, ulong magicNumber, double profit) {
    */
    
     printf("buying %f", amount);
-    double lastPrice = getLastPrice();
+    double lastPrice = getLastAskPrice();
     MqlTradeRequest request={0};
     request.action = TRADE_ACTION_DEAL;
     request.type = ORDER_TYPE_BUY;
@@ -223,7 +234,7 @@ uint marketSell(double amount, ulong magicNumber, double profit){
    return 1;
    */
     printf("selling %f", amount);
-    double lastPrice = getLastPrice();
+    double lastPrice = getLastAskPrice();
     MqlTradeRequest request={0};
     request.action = TRADE_ACTION_DEAL;
     request.type = ORDER_TYPE_SELL;
@@ -313,6 +324,7 @@ class OrderCell: public CObject {
       OrderCell(double price, ulong id, ENUM_ORDER_TYPE orderTypeMy, double orderVolume, ulong theMagic, 
          double tp, double sl) {
          this.openPrice = price;
+         printf("OpenPrice in constructor: %G", this.openPrice);
          this.orderId = id;
          this.orderType = orderTypeMy;
          this.volume = orderVolume;
@@ -440,19 +452,22 @@ class OrderCell: public CObject {
       }
       
       void logLoss(double closePrice, LossList* list) {
-         
+         printf("logLoss triggered");
          double netProfit=0;
-         if(this.orderType == ORDER_TYPE_BUY) {
-            netProfit = closePrice - this.openPrice;
+         if(this.orderType == ORDER_TYPE_BUY || this.orderType == ORDER_TYPE_BUY_LIMIT) {
+            netProfit = closePrice - this.openPrice; 
          }
          
-         if(this.orderType == ORDER_TYPE_SELL) {
+         
+         if(this.orderType == ORDER_TYPE_SELL || this.orderType == ORDER_TYPE_SELL_LIMIT) {
             netProfit = this.openPrice - closePrice;
          }
          printf("netProfit is: %G", netProfit);
          if(netProfit < 0) {
             Alert("Loss ", netProfit);
-            printf("loss ----------- %d", netProfit);
+            printf("loss ----------- %G", netProfit);
+            printf("closePrice: %G", closePrice);
+            printf("openPrice: %G", this.openPrice);
             LossObject *loss = new LossObject(this.magic, -netProfit);
             
             list.Add(loss);
@@ -473,7 +488,7 @@ class TickList: public CList {
      
       string terminal_data_path = TerminalInfoString(TERMINAL_DATA_PATH);
       string filename = "";
-      TickObject *tickObject = this.GetNodeAtIndex(1);
+      TickObject *tickObject = this.GetNodeAtIndex(0);
       
       if(tickObject != NULL) {
 
@@ -503,6 +518,12 @@ class TickList: public CList {
        
          int total = this.Total();
          TickObject * to;
+         if(total == 0) {
+            string row = "nothing~";
+            FileWrite(fileHandle, row);
+            
+         }
+         
          for(int i=0;i<total;i++){
             to = this.GetNodeAtIndex(i);
             string row = "";
@@ -510,6 +531,7 @@ class TickList: public CList {
             StringConcatenate(row, fileHandle,to.tick.time, ", ", DoubleToString(to.tick.last,5) );
             FileWrite(fileHandle, row);
          }
+         
          
          FileClose(fileHandle);
          //Print("File Writing successful! ");
@@ -555,7 +577,7 @@ class OrderList: public CList {
    
    double netPosition;
    LossList *lossList;
-   OrderList(LossList* l) {
+   OrderList(LossList*& l) {
       this.netPosition = 0;
       this.lossList = l;
    }
@@ -589,6 +611,7 @@ class OrderList: public CList {
          }
       }
    }
+
    void updateOrderCells (const MqlTradeTransaction& trans, 
       const MqlTradeRequest& request, 
       const MqlTradeResult& result) {
@@ -603,20 +626,20 @@ class OrderList: public CList {
       printf("transaction type: " + EnumToString(trans.type));
       
       if(trans.type == TRADE_TRANSACTION_HISTORY_ADD) {
-         printRequest(request);
-         printResult(result);
-         printTradeTransaction(trans);
+         //printRequest(request);
+         //printResult(result);
+         //printTradeTransaction(trans);
       }
       if(trans.type == TRADE_TRANSACTION_REQUEST ) {
          // only 0 data in request and result when TRADE_TRANSACTION_HISTORY_ADD
          // only TRADE_TRANSACTION_REQUEST contains magic
-         printf("result.price:   %f", result.price);
+         printf("request.price:   %f", request.price);
          printf("result.order:  %d", result.order);
          printf("request.type:  %s", EnumToString(request.type));
          printf("result.volume: %f", result.volume);
          printf("request.magic %d", request.magic);
       
-         orderPrice  = result.price; // 1
+         orderPrice  = request.price; // 1
          orderId     = result.order; // 2
          orderType   = request.type; // 3
          orderVolume = result.volume;// 4
@@ -663,8 +686,75 @@ class OrderList: public CList {
          // 2. found by stop loss price
              // if in opposite direction then
              // log loss, and remove the order from the list
-      
+         int index[2] = {0};
+         index[0] = this.findByTakeProfitPrice(trans.price);
+         index[1] = this.findByStopLossPrice(trans.price);
+         
+         for(int i=0;i<ArraySize( index);i++){
+
+            if(index[i] != -1) {
+               // found
+               
+               printf("found by take profit price, index is: %d ", index[i] );
+               
+               OrderCell *order = this.GetNodeAtIndex(index[i]);
+               // buy direction
+               if(order.orderType == ORDER_TYPE_BUY || order.orderType == ORDER_TYPE_BUY_LIMIT) {
+                  if(trans.order_type == ORDER_TYPE_SELL ) {
+                     // confirmed
+                     order.logLoss(trans.price,this.lossList);
+                     this.Delete(index[i]);                 
+                  }
+               }
+               // sell direction
+               if(order.orderType == ORDER_TYPE_SELL || order.orderType == ORDER_TYPE_SELL_LIMIT) {
+                  if(trans.order_type == ORDER_TYPE_BUY ) {
+                     // confirmed
+                     order.logLoss(trans.price,this.lossList);
+                     this.Delete(index[i]);                 
+                  }
+               }
+            }            
+         }
       }
+   }
+   
+   int findByTakeProfitPrice(double takeProfit) {
+      OrderCell *order = NULL;
+      int total = this.Total();
+      
+      for(int i=0;i<total;i++){
+         order = this.GetNodeAtIndex(i);
+         string str1 = DoubleToString(order.takeProfitPrice, 5);
+         string str2 = DoubleToString(takeProfit,5);
+         
+         if( StringCompare(str1,str2) == 0) {
+            // equal
+            return i;
+         }     
+      }
+      
+      return -1;
+   }
+   
+   int findByStopLossPrice(double stopLoss) {
+
+      OrderCell *order = NULL;
+      int total = this.Total();
+      
+      for(int i=0;i<total;i++){
+         order = this.GetNodeAtIndex(i);
+         string str1 = DoubleToString(order.stopLossPrice, 5);
+         string str2 = DoubleToString(stopLoss,5);
+         
+         if( StringCompare(str1, str2) == 0) {
+            // equal
+            return i;
+         }     
+      }
+      
+      return -1;
+   
    }
    
    void preventLoss() {
@@ -734,7 +824,7 @@ class OrderList: public CList {
             
       }
       return -1;
-   } DEAL_TYPE
+   } 
    
    void deleteAll() {
 

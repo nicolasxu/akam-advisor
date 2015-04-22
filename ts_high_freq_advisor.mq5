@@ -18,7 +18,10 @@ int billyMagic = 205;
 OrderList *orderList;
 LossList  *lossList;
 int minuteCounter = 0;
-double initialOrderSize = 1.0; // 1 lot
+double initialOrderSize = 2.0; // 1 lot
+double threeTimesOrderSize = 20.0;
+double nextOrderSize = 0;
+double accountBalance = 0;
 
 /*  
 
@@ -121,8 +124,10 @@ int OnInit() {
    //EventSetMillisecondTimer(60*1000);
    
    EventSetTimer(1*60);
-   
+   lossList = new LossList();
    orderList = new OrderList(lossList);
+   nextOrderSize = initialOrderSize;
+   accountBalance = AccountInfoDouble(ACCOUNT_BALANCE);
    if(orderList == NULL) {
       printf("Init CList error");
       return INIT_FAILED;   
@@ -137,10 +142,7 @@ int OnInit() {
 void OnDeinit(const int reason) {
 //--- destroy timer
    EventKillTimer();
-   
-   OrderCell *order = orderList.GetNodeAtIndex(0);
-   printf("****order.stopLossPrice: %G", order.stopLossPrice);
-   printf("****order.takeProfitPrice: %G", order.takeProfitPrice);
+  
    delete tickList;
    delete orderList;
    delete lossList;
@@ -163,6 +165,24 @@ void OnTimer(){
   
    minuteCounter++;
    
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(balance < accountBalance) {
+      nextOrderSize = threeTimesOrderSize;
+      //printf("nextOrderSize is: %G", nextOrderSize);
+      
+   } 
+   if(balance > accountBalance) {
+      nextOrderSize = initialOrderSize;
+      //printf("nextOrderSize is: %G", nextOrderSize);
+      
+   }
+   accountBalance = balance;
+   if(minuteCounter % 5 == 0) {
+      //printf("balance is: %G", balance); 
+        
+   }
+
+   
    if(minuteCounter > 12*60) {
       double position = orderList.netPosition;
       
@@ -172,12 +192,7 @@ void OnTimer(){
       if(position < 0) {
          marketBuy(-position, closePositionMagic, 0);
       }
-   
    }
-   
-
-
-
 }
 
 void OnNewBar() {
@@ -191,7 +206,7 @@ void OnNewBar() {
    crossCounter = 0;
    double openPrice = getCurrentBarOpenPrice(0);
 
-   limitSell(initialOrderSize,billyMagic++,openPrice, openPrice - 100*Point(),openPrice + 800*Point());
+   limitSell(nextOrderSize,billyMagic++,openPrice, openPrice - 50*Point(), openPrice + 800*Point());
 
 }
 
